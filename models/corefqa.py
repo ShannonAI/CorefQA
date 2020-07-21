@@ -90,7 +90,6 @@ class CorefQAModel(object):
         # num_candidate_mention_in_doc is smaller than num_subtoken_in_doc
 
         candidate_cluster_idx_labels = self.get_candidate_cluster_labels(candidate_mention_starts, candidate_mention_ends, gold_start_index_labels, gold_end_index_labels, gold_cluster_ids)
-        # 
 
         candidate_mention_span_embs, candidate_mention_start_embs, candidate_mention_end_embs = self.get_candidate_span_embedding(
             mention_doc_flat_embs, candidate_mention_starts, candidate_mention_ends) 

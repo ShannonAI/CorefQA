@@ -68,13 +68,13 @@ $ pip install google-cloud-storage
 1) Download the offical released [Ontonotes 5.0 (LDC2013T19)](https://catalog.ldc.upenn.edu/LDC2013T19). <br> 
 2) Preprocess Ontonotes5 annotations files for the CoNLL-2012 coreference resolution task. <br> 
 Run the command with **Python 2**
-`bash ./scripts/data/preprocess_ontonotes_annfiles.sh  <path_to_LDC2013T19-ontonotes5.0_directory>  <path_to_save_CoNLL12_coreference_resolution_directory> <language>`<br> 
+`bash ./scripts/data/preprocess_ontonotes_annfiles.sh  <path_to_LDC2013T19-ontonotes5_directory>  <path_to_save_CoNLL12_coreference_resolution_directory> <language>`<br> 
 and it will create `{train/dev/test}.{language}.v4_gold_conll` files in the directory `<path_to_save_CoNLL12_coreference_resolution_directory>`. <br> 
 `<language>` can be `english`, `arabic` or `chinese`. In this paper, we set `<language>` to `english`. <br>
 If you want to use **Python 3**, please refer to the
 [guideline](https://github.com/huggingface/neuralcoref/blob/master/neuralcoref/train/training.md#get-the-data) <br> 
 3) Generate TFRecord files for experiments. <br> 
-Run the command with **Python 3** `bash ./scripts/data/generate_tfrecord_dataset.sh <path_to_save_CoNLL12_coreference_resolution_directory>  <path_to_save_tfrecord_directory> <path_to_vocab_file>`
+Run the command with **Python 3** `bash ./scripts/data/generate_tfrecord_dataset.sh <path_to_save_CoNLL12_coreference_resolution_directory>  <path_to_save_tfrecord_directory> <path_to_pretrain_mlm_vocab_file>`
 and it will create `{train/dev/test}.overlap.corefqa.{language}.tfrecord` files in the directory `<path_to_save_CoNLL12_coreference_resolution_directory>`. <br> 
 
 ## Download Pretrained MLM

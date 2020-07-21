@@ -17,7 +17,6 @@ from func_builders.model_fn_builder import model_fn_builder
 from func_builders.input_fn_builder import file_based_input_fn_builder
 from utils.metrics import mention_proposal_prediction
 
-
 tf.app.flags.DEFINE_string('f', '', 'kernel')
 flags = tf.app.flags
 
@@ -56,7 +55,7 @@ flags.DEFINE_integer("max_num_mention", 30, "The max number of mentions in one d
 flags.DEFINE_bool("start_end_share", False, "Whether only to use [start, end] embedding to calculate the start/end scores.") 
 flags.DEFINE_float("loss_start_ratio", 0.3, "As described in the paper, the loss for a span being a mention is -loss_start_ratio* log p(the start of the given span is a start).")
 flags.DEFINE_float("loss_end_ratio", 0.3, "As described in the paper, the loss for a span being a mention is -loss_end_ratio* log p(the end of the given span is a end).")
-flags.DEFINE_float("loss_span_ratio", 0.3, "As described in the paper, the loss for a span being a mention is -loss_span_ratio* log p(the start and the end forms a span).")
+flags.DEFINE_float("loss_span_ratio", 0.4, "As described in the paper, the loss for a span being a mention is -loss_span_ratio* log p(the start and the end forms a span).")
 
 
 flags.DEFINE_bool("use_tpu", False, "Whether to use TPU or GPU/CPU.")
@@ -99,11 +98,11 @@ def main(_):
     run_config = tf.contrib.tpu.RunConfig(
         cluster=tpu_cluster_resolver,
         master=FLAGS.master,
-        evaluation_master=FLAGS.master,
+        # evaluation_master=FLAGS.master,
         model_dir=FLAGS.output_dir,
         keep_checkpoint_max = keep_chceckpoint_max,
         save_checkpoints_steps=FLAGS.save_checkpoints_steps,
-        session_config=tf.ConfigProto(allow_soft_placement=True, log_device_placement=True),
+        # session_config=tf.ConfigProto(allow_soft_placement=True, log_device_placement=True),
         tpu_config=tf.contrib.tpu.TPUConfig(
             iterations_per_loop=FLAGS.iterations_per_loop,
             num_shards=FLAGS.num_tpu_cores,
@@ -116,19 +115,18 @@ def main(_):
     model_fn = model_fn_builder(model_config, model_sign="mention_proposal")
     estimator = tf.contrib.tpu.TPUEstimator(
         use_tpu=FLAGS.use_tpu,
-        eval_on_tpu=FLAGS.use_tpu,
+        # eval_on_tpu=FLAGS.use_tpu,
         warm_start_from=tf.estimator.WarmStartSettings(FLAGS.init_checkpoint,
             vars_to_warm_start="bert*"),
         model_fn=model_fn,
         config=run_config,
         train_batch_size=1,
-        eval_batch_size=1,
         predict_batch_size=1)
 
 
     if FLAGS.do_train:
-        estimator.train(input_fn=file_based_input_fn_builder(FLAGS.train_file, num_window=FLAGS.num_window,
-            window_size=FLAGS.window_size, max_num_mention=FLAGS.max_num_mention, is_training=True, drop_remainder=True), max_steps=num_train_steps)
+        estimator.train(input_fn=file_based_input_fn_builder(model_config.train_file, num_window=model_config.num_window,
+            window_size=model_config.window_size, max_num_mention=model_config.max_num_mention, is_training=True, drop_remainder=True), max_steps=num_train_steps)
 
 
     if FLAGS.do_eval:

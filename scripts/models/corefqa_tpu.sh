@@ -46,7 +46,7 @@ python3 ${REPO_PATH}/run/run_corefqa.py \
 --max_num_mention=20 \
 --start_end_share=False \
 --max_span_width=20 \
---max_candiate_mentions=50 \
+--max_candidate_mentions=50 \
 --top_span_ratio=0.2 \
 --max_top_antecedents=30 \
 --max_query_len=150 \

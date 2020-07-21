@@ -14,6 +14,7 @@ import tensorflow as tf
 def file_based_input_fn_builder(input_file, num_window=None, window_size=None, max_num_mention=None, is_training=False, drop_remainder=True):
     """Creates an `input_fn` closure to be passed to TPUEstimator."""
     name_to_features = {
+            'sentence_map': tf.FixedLenFeature([num_window * window_size], tf.int64),
             'text_len': tf.FixedLenFeature([num_window], tf.int64),
             'subtoken_map': tf.FixedLenFeature([num_window *  window_size], tf.int64),
             'speaker_ids': tf.FixedLenFeature([num_window * window_size], tf.int64),
@@ -22,7 +23,8 @@ def file_based_input_fn_builder(input_file, num_window=None, window_size=None, m
             'span_starts': tf.FixedLenFeature([max_num_mention], tf.int64),
             'span_ends': tf.FixedLenFeature([max_num_mention], tf.int64), 
             'cluster_ids': tf.FixedLenFeature([max_num_mention], tf.int64),
-            'sentence_map': tf.FixedLenFeature([num_window * window_size], tf.int64)}
+            }
+
 
     def _decode_record(record, name_to_features):
         """Decodes a record to a TensorFlow example."""
@@ -52,7 +54,7 @@ def file_based_input_fn_builder(input_file, num_window=None, window_size=None, m
         tf.contrib.data.map_and_batch(
             lambda record: _decode_record(record, name_to_features),
             batch_size=batch_size,
-            drop_remainder=True))
+            drop_remainder=drop_remainder))
 
         return d
         

@@ -17,7 +17,7 @@ import json
 import argparse 
 import numpy as np 
 import tensorflow as tf
-from collections import defaultdict
+from collections import OrderedDict
 
 REPO_PATH = "/".join(os.path.realpath(__file__).split("/")[:-2])
 if REPO_PATH not in sys.path:
@@ -102,7 +102,7 @@ def prepare_train_dataset(input_file, output_data_dir, output_filename, window_s
     documents = read_conll_file(input_file)
     for doc_idx, document in enumerate(documents):
         doc_info = parse_document(document, language)
-        tokenized_document = tokenize_document(genres, doc_info, tokenizer, max_doc_length=max_doc_length)
+        tokenized_document = tokenize_document(genres, doc_info, tokenizer)
         doc_key = tokenized_document['doc_key']
         token_windows, mask_windows, text_len = convert_to_sliding_window(tokenized_document, window_size)
         input_id_windows = [tokenizer.convert_tokens_to_ids(tokens) for tokens in token_windows]
@@ -123,6 +123,7 @@ def prepare_train_dataset(input_file, output_data_dir, output_filename, window_s
 
 def write_instance_to_example_file(writer, instance, doc_key, window_size=64, num_window=5, max_num_mention=20,
     max_num_cluster=30, pad_idx=-1):
+
     input_ids, input_mask, text_len, speaker_ids, genre, gold_starts, gold_ends, cluster_ids, sentence_map = instance 
     input_id_windows = input_ids 
     mask_windows = input_mask 
@@ -145,17 +146,17 @@ def write_instance_to_example_file(writer, instance, doc_key, window_size=64, nu
     gold_ends = clip_or_pad(gold_ends, max_num_mention, pad_idx=pad_idx)
     cluster_ids = clip_or_pad(cluster_ids, max_num_cluster, pad_idx=pad_idx)
 
-    features = {
-        'sentence_map': create_int_feature(sentence_map), 
-        'text_len': create_int_feature(text_len), 
-        'subtoken_map': create_int_feature(tmp_subtoken_maps), 
-        'speaker_ids': create_int_feature(tmp_speaker_ids), 
-        'flattened_input_ids': create_int_feature(flattened_input_ids),
-        'flattened_input_mask': create_int_feature(flattened_input_mask),
-        'span_starts': create_int_feature(gold_starts), 
-        'span_ends': create_int_feature(gold_ends), 
-        'cluster_ids': create_int_feature(cluster_ids),
-    }
+    features = OrderedDict()
+    features['sentence_map'] = create_int_feature(sentence_map)
+    features['text_len'] = create_int_feature(text_len)
+    features['subtoken_map'] = create_int_feature(tmp_subtoken_maps)
+    features['speaker_ids'] = create_int_feature(tmp_speaker_ids)
+    features['flattened_input_ids'] = create_int_feature(flattened_input_ids)
+    features['flattened_input_mask'] = create_int_feature(flattened_input_mask)
+    features['span_starts'] = create_int_feature(gold_starts)
+    features['span_ends'] = create_int_feature(gold_ends)
+    features['cluster_ids'] = create_int_feature(cluster_ids)
+
     tf_example = tf.train.Example(features=tf.train.Features(feature=features))
     writer.write(tf_example.SerializeToString())
 
@@ -253,20 +254,29 @@ def coreference_annotations_to_clusters(annotations):
     :param annotations:
     :return:
     """
-    clusters = defaultdict(list)
-    coref_stack = defaultdict(list)
+    clusters = OrderedDict()
+    coref_stack = OrderedDict()
     for word_idx, annotation in enumerate(annotations):
         if annotation == '-':
             continue
         for ann in annotation.split('|'):
             cluster_id = int(ann.replace('(', '').replace(')', ''))
             if ann[0] == '(' and ann[-1] == ')':
-                clusters[cluster_id].append((word_idx, word_idx))
+                if cluster_id not in clusters.keys():
+                    clusters[cluster_id] = [(word_idx, word_idx)]
+                else:
+                    clusters[cluster_id].append((word_idx, word_idx))
             elif ann[0] == '(':
-                coref_stack[cluster_id].append(word_idx)
+                if cluster_id not in coref_stack.keys():
+                    coref_stack[cluster_id] = [word_idx]
+                else:
+                    coref_stack[cluster_id].append(word_idx)
             elif ann[-1] == ')':
                 span_start = coref_stack[cluster_id].pop()
-                clusters[cluster_id].append((span_start, word_idx))
+                if cluster_id not in clusters.keys():
+                    clusters[cluster_id] = [(span_start, word_idx)]
+                else:
+                    clusters[cluster_id].append((span_start, word_idx))
             else:
                 raise NotImplementedError
     assert all([len(starts) == 0 for starts in coref_stack.values()])
@@ -279,7 +289,7 @@ def checkout_clusters(doc_info):
     print(clusters)
 
 
-def tokenize_document(genres, doc_info, tokenizer, max_doc_length):
+def tokenize_document(genres, doc_info, tokenizer):
     """
     tokenize into sub tokens
     :param doc_info:
@@ -301,11 +311,8 @@ def tokenize_document(genres, doc_info, tokenizer, max_doc_length):
             sub_tokens.extend(word_tokens)
             sentence_map.extend([sentence_id] * len(word_tokens))
             subtoken_map.extend([word_idx] * len(word_tokens))
-    if max_doc_length:
-        num_to_pad = max_doc_length - len(sub_tokens)
-        sub_tokens.extend(["[PAD]"] * num_to_pad)
-        sentence_map.extend([sentence_map[-1]+1] * num_to_pad)
-        subtoken_map.extend(list(range(word_idx+1, num_to_pad+1+word_idx)))
+    
+
     subtoken_maps[doc_info['doc_key']] = subtoken_map
     genre = genres.get(doc_info['doc_key'][:2], 0)
     speakers = {subtoken_map.index(word_index): tokenizer.tokenize(speaker)

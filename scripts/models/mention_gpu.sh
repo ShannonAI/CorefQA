@@ -10,7 +10,7 @@
 
 
 REPO_PATH=/home/lixiaoya/xiaoy_tf
-export PYTHONPATH=${REPO_PATH}
+export PYTHONPATH="$PYTHONPATH:$REPO_PATH"
 
 output_dir=/xiaoya/mention_proposal_output
 bert_dir=/xiaoya/pretrain_ckpt/uncased_L-2_H-128_A-2
