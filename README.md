@@ -124,7 +124,7 @@ The `<path-to-save-model>` is the path to save finetuned spanbert on SQuAD2.0 da
 - Download Quoref [train and dev](https://quoref-dataset.s3-us-west-2.amazonaws.com/train_and_dev/quoref-train-dev-v0.1.zip) sets.
 - Finetune the SpanBERT model on Google Could V3-8 TPU. 
 
-For Squad 2.0, Run the script in [./script/model/squad_tpu.sh]()
+For Squad 2.0, Run the script in [./script/model/squad_tpu.sh](https://github.com/ShannonAI/CorefQA/blob/master/scripts/models/squad_tpu.sh)
   ```bash 
   
    REPO_PATH=/home/shannon/coref-tf
@@ -155,7 +155,7 @@ For Squad 2.0, Run the script in [./script/model/squad_tpu.sh]()
   ```
 After getting the best model (choose based on the performance on dev set) on `SQuAD2.0`, you should start finetuning the saved model on `Quoref`. <br>
 
-Run the script in [./script/model/quoref_tpu.sh]() 
+Run the script in [./script/model/quoref_tpu.sh](https://github.com/ShannonAI/CorefQA/blob/master/scripts/models/quoref_tpu.sh) 
   ```bash 
   
    REPO_PATH=/home/shannon/coref-tf
@@ -190,7 +190,7 @@ We use the best model (choose based on the performance on DEV set) on `Quoref` t
 
 1.2. Or train  the mention proposal model yourself. 
 
-The script can be found in [./script/model/mention_tpu.sh]().
+The script can be found in [./script/model/mention_tpu.sh](https://github.com/ShannonAI/CorefQA/blob/master/scripts/models/mention_tpu.sh).
 
 ```bash 
 
@@ -243,7 +243,7 @@ python3 ${REPO_PATH}/run/run_mention_proposal.py \
 
 After getting the best mention proposal model on the dev set, start jointly training the mention proposal and linking tasks. 
 
-Run and the script can be found in [./script/model/corefqa_tpu.sh]()
+Run and the script can be found in [./script/model/corefqa_tpu.sh](https://github.com/ShannonAI/CorefQA/blob/master/scripts/models/corefqa_tpu.sh)
 
 ```bash
 
@@ -311,7 +311,7 @@ The codebase also provides the option of evaluating a single model/checkpoint. P
 <br>
  
 ## Download the Final CorefQA Model
-You can download the final CorefQA model at [link]() and follow the instructions in the prediciton to obtain the score reported in the paper. 
+You can download the final CorefQA model at [link](https://storage.googleapis.com/public_model_checkpoints) and follow the instructions in the prediciton to obtain the score reported in the paper. 
 
 
 ## Descriptions of Directories
