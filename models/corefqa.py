@@ -79,8 +79,8 @@ class CorefQAModel(object):
         # the number if eligible mentions of each subdocument is  config.max_span_width * num_subtoken_in_doc
         candidate_mention_ends = tf.math.add(candidate_mention_starts, tf.expand_dims(tf.range(self.config.max_span_width), 0)) # (num_subtoken_in_doc, max_span_width)
         
-        candidate_mention_sentence_start_idx = tf.gather(flat_doc_sentence_map, candidate_mention_starts) # (num_subtoken_in_doc, max_span_width)
-        candidate_mention_sentence_end_idx = tf.gather(flat_doc_sentence_map, candidate_mention_ends) # (num_subtoken_in_doc, max_span_width)
+        candidate_mention_sentence_start_idx = tf.gather(tf.reshape(flat_doc_sentence_map, [-1]), candidate_mention_starts) # (num_subtoken_in_doc, max_span_width)
+        candidate_mention_sentence_end_idx = tf.gather(tf.reshape(flat_doc_sentence_map, [-1]), candidate_mention_ends) # (num_subtoken_in_doc, max_span_width)
         
         candidate_mention_mask = tf.logical_and(candidate_mention_ends < num_subtoken_in_doc, tf.equal(candidate_mention_sentence_start_idx, candidate_mention_sentence_end_idx))
         candidate_mention_mask = tf.reshape(candidate_mention_mask, [-1]) 
@@ -136,7 +136,8 @@ class CorefQAModel(object):
         forward_qa_input_token_type_mask = tf.zeros((1, self.config.num_window, self.config.window_size + self.config.max_query_len + 2), dtype=tf.int32) # (1, num_window, max_query_len + window_size + 2)
 
         # prepare for non-overlap input token ids 
-        nonoverlap_doc_input_ids = self.transform_overlap_sliding_windows_to_original_document(flat_window_input_ids, flat_doc_overlap_input_mask) # (num_subtoken_in_doc)
+        doc_overlap_input_mask = tf.reshape(flat_doc_overlap_input_mask, [self.config.num_window, self.config.window_size])
+        nonoverlap_doc_input_ids = self.transform_overlap_sliding_windows_to_original_document(flat_window_input_ids, doc_overlap_input_mask) # (num_subtoken_in_doc)
         overlap_window_input_ids = tf.reshape(flat_window_input_ids, [self.config.num_window, self.config.window_size]) # (num_window, window_size)
 
         @tf.function
@@ -165,6 +166,10 @@ class CorefQAModel(object):
             query_context_input_token_mask = tf.concat([tf.ones_like(cls_tokens, tf.int32), expand_pad_query_input_token_mask, tf.ones_like(sep_tokens, tf.int32), tf.ones_like(overlap_window_input_ids, tf.int32)], axis=1) # (1, num_window, max_query_len + window_size + 2)
             query_context_input_token_type_mask = tf.concat([tf.zeros_like(cls_tokens, tf.int32), expand_pad_query_input_token_type_mask, tf.zeros_like(sep_tokens, tf.int32), tf.ones_like(overlap_window_input_ids, tf.int32)], axis=1) # (1, num_window, max_query_len + window_size + 2)
 
+            query_context_input_token_ids = tf.reshape(query_context_input_token_ids, [1, self.config.num_window, self.config.max_query_len+self.config.window_size+2])
+            query_context_input_token_mask = tf.reshape(query_context_input_token_mask, [1, self.config.num_window, self.config.max_query_len+self.config.window_size+2])
+            query_context_input_token_type_mask = tf.reshape(query_context_input_token_type_mask, [1, self.config.num_window, self.config.max_query_len+self.config.window_size+2])
+
 
             return [tf.math.add(i, 1), tf.concat([batch_qa_input_ids, query_context_input_token_ids], 0), 
                     tf.concat([batch_qa_input_mask, query_context_input_token_mask], 0), 
@@ -192,14 +197,14 @@ class CorefQAModel(object):
 
         forward_qa_overlap_window_embs = forward_qa_linking_model.get_sequence_output() # (k * num_window, max_query_len + window_size + 2, hidden_size)
         forward_context_overlap_window_embs = self.transform_overlap_sliding_windows_to_original_document(forward_qa_overlap_window_embs, batch_forward_qa_input_type_mask)
-        forward_context_overlap_window_embs = tf.reshape(forward_context_overlap_window_embs, [self.k*self.config.num_widnow, self.config.window_size])
+        forward_context_overlap_window_embs = tf.reshape(forward_context_overlap_window_embs, [self.k*self.config.num_window, self.config.window_size])
         # forward_context_overlap_window_embs -> (k*num_window, window_size, hidden_size)
 
         expand_doc_overlap_input_mask = tf.tile(tf.expand_dims(doc_overlap_input_mask, 0), [self.k, 1, 1]) # (k, num_window, window_size)
         expand_doc_overlap_input_mask = tf.reshape(expand_doc_overlap_input_mask, [-1, self.config.window_size]) # (k * num_window, window_size)
 
         forward_context_flat_doc_embs = self.transform_overlap_sliding_windows_to_original_document(forward_context_overlap_window_embs, expand_doc_overlap_input_mask) # (k * num_subtoken_in_doc, hidden_size)
-        forward_context_flat_doc_embs = self.reshape(forward_context_flat_doc_embs, [self.k, -1, self.config.hidden_size]) # (k, num_subtoken_in_doc, hidden_size)
+        forward_context_flat_doc_embs = tf.reshape(forward_context_flat_doc_embs, [self.k, -1, self.config.hidden_size]) # (k, num_subtoken_in_doc, hidden_size)
         num_candidate_mention = self.get_shape(candidate_mention_span_embs, 0) # (num_candidate_mention_in_doc)
         forward_qa_mention_pos_offset = tf.cast(tf.tile(tf.reshape(tf.range(0, num_candidate_mention) * num_subtoken_in_doc, [1, -1]), [self.k, 1]), tf.int32) # (k, num_candidate_mention_in_doc)
 
@@ -239,11 +244,12 @@ class CorefQAModel(object):
         ## backward QA score computation begins
         ## we need to compute the score of backward score, i.e., the span i is the correferent answer for j, denoted by s(i|j)
         i0 = tf.constant(0)
-        backward_qa_input_ids = tf.zeros((1, self.config.max_query_len + self.config.max_context_len + 2), dtype=tf.int32) # (1, max_query_len + max_context_len + 2)
-        backward_qa_input_mask = tf.zeros((1, self.config.max_query_len + self.config.max_context_len + 2), dtype=tf.int32) # (1, max_query_len + max_context_len + 2)
-        backward_qa_input_token_type_mask = tf.zeros((1, self.config.max_query_len + self.config.max_context_len + 2), dtype=tf.int32) # (1, max_query_len + max_context_len + 2)
+        backward_qa_input_ids = tf.reshape(tf.zeros((1, self.config.max_query_len + self.config.max_context_len + 2), dtype=tf.int32), [1, -1]) # (1, max_query_len + max_context_len + 2)
+        backward_qa_input_mask = tf.reshape(tf.zeros((1, self.config.max_query_len + self.config.max_context_len + 2), dtype=tf.int32), [1, -1]) # (1, max_query_len + max_context_len + 2)
+        backward_qa_input_token_type_mask = tf.reshape(tf.zeros((1, self.config.max_query_len + self.config.max_context_len + 2), dtype=tf.int32), [1, -1]) # (1, max_query_len + max_context_len + 2)
         backward_qa_mention_start_in_context = tf.convert_to_tensor(tf.constant([0]), dtype=tf.int32)
         backward_qa_mention_end_in_context = tf.convert_to_tensor(tf.constant([0]), dtype=tf.int32)
+        
 
         @tf.function
         def backward_qa_mention_linking(i, batch_qa_input_ids, batch_qa_input_mask, batch_qa_input_token_type_mask, 
@@ -276,15 +282,21 @@ class CorefQAModel(object):
             sep_tokens = tf.cast(tf.fill([1], self.sep_in_vocab), tf.int32) # (num_window, 1)
             cls_tokens = tf.cast(tf.fill([1], self.cls_in_vocab), tf.int32) # (num_window, 1)
 
-            query_context_input_token_ids = tf.concat([cls_tokens, pad_query_input_token_ids, sep_tokens, pad_context_input_token_ids], axis=1)
-            query_context_input_token_mask = tf.concat([tf.ones_like(cls_tokens, tf.int32), pad_query_input_token_mask, tf.zeros_like(sep_tokens, tf.int32), pad_context_input_token_mask], axis=1)
-            query_context_input_token_type_mask = tf.concat([tf.zeros_like(cls_tokens, tf.int32), pad_query_input_token_type_mask, tf.zeros_like(sep_tokens, tf.int32), pad_context_input_token_type_mask], axis=1)
+            query_context_input_token_ids = tf.concat([cls_tokens, pad_query_input_token_ids, sep_tokens, pad_context_input_token_ids], axis=0)
+            query_context_input_token_mask = tf.concat([tf.ones_like(cls_tokens, tf.int32), pad_query_input_token_mask, tf.zeros_like(sep_tokens, tf.int32), pad_context_input_token_mask], axis=0)
+            query_context_input_token_type_mask = tf.concat([tf.zeros_like(cls_tokens, tf.int32), pad_query_input_token_type_mask, tf.zeros_like(sep_tokens, tf.int32), pad_context_input_token_type_mask], axis=0)
+
+            query_context_input_token_ids = tf.reshape(query_context_input_token_ids, [1, self.config.max_query_len + self.config.max_context_len + 2])
+            query_context_input_token_mask = tf.reshape(query_context_input_token_mask, [1, self.config.max_query_len + self.config.max_context_len + 2])
+            query_context_input_token_type_mask = tf.reshape(query_context_input_token_type_mask, [1, self.config.max_query_len + self.config.max_context_len + 2])
+            mention_start_idx_in_context = tf.reshape(mention_start_idx_in_context, [-1])
+            mention_end_idx_in_context = tf.reshape(mention_end_idx_in_context, [-1])
 
             return [tf.math.add(i, 1), tf.concat([batch_qa_input_ids, query_context_input_token_ids], 0), 
                     tf.concat([batch_qa_input_mask, query_context_input_token_mask], 0), 
                     tf.concat([batch_qa_input_token_type_mask, query_context_input_token_type_mask], 0), 
                     tf.concat([backward_qa_mention_start_in_context, mention_start_idx_in_context], 0), 
-                    tf.concat([ backward_qa_mention_end_in_context, mention_end_idx_in_context], 0)]
+                    tf.concat([backward_qa_mention_end_in_context, mention_end_idx_in_context], 0)]
 
 
         _, stack_backward_qa_input_ids, stack_backward_qa_input_mask, stack_backward_qa_input_type_mask, stack_backward_mention_start_in_context, stack_backward_mention_end_in_context = tf.while_loop(
@@ -331,6 +343,7 @@ class CorefQAModel(object):
         #############
         ############# backward QA computation ends
         
+        forward_topc_mention_span_scores = tf.reshape(forward_topc_mention_span_scores, [-1])
         expand_forward_topc_mention_span_scores = tf.tile(tf.expand_dims(forward_topc_mention_span_scores, 0), [self.k, 1]) # forward_topc_mention_span_scores -> (c); expand_forward_topc_mention_span_scores -> (c, k)
         expand_forward_topc_mention_span_scores_in_mention_proposal = tf.tile(tf.expand_dims(forward_topc_mention_span_scores_in_mention_proposal, 0), [self.k, 1])
         expand_topk_mention_span_scores = tf.tile(tf.expand_dims(topk_mention_span_scores, 1), [1, self.c]) # (k, c)
@@ -467,9 +480,9 @@ class CorefQAModel(object):
         gold_label_candidate_mention_starts = tf.gather(gold_start_sequence_label, candidate_mention_starts)
         gold_label_candidate_mention_ends = tf.gather(gold_end_sequence_label, candidate_mention_ends)
 
-        gold_mention_sparse_label = tf.stack([gold_start_index_labels, gold_end_index_labels], axis=1)
+        gold_mention_sparse_label = tf.reshape(tf.stack([gold_start_index_labels, gold_end_index_labels], axis=1), [2, -1])
         gold_span_value = tf.reshape(tf.ones_like(gold_start_index_labels, tf.int32), [-1])
-        gold_span_shape = tf.constant([expect_length_of_labels, expect_length_of_labels])
+        gold_span_shape = tf.Variable([expect_length_of_labels, expect_length_of_labels], shape=(2, )) 
         gold_span_label = tf.cast(tf.scatter_nd(gold_mention_sparse_label, gold_span_value, gold_span_shape), tf.int32)
 
         candidate_mention_spans = tf.stack([candidate_mention_starts, candidate_mention_ends], axis=1)
@@ -519,8 +532,10 @@ class CorefQAModel(object):
     def get_candidate_cluster_labels(self, candidate_mention_starts, candidate_mention_ends, 
             gold_mention_starts, gold_mention_ends, gold_cluster_ids):
         
-        same_mention_start = tf.equal(tf.expand_dims(gold_mention_starts, 1), tf.expand_dims(candidate_mention_starts, 0))
-        same_mention_end = tf.equal(tf.expand_dims(gold_mention_ends, 1), tf.expand_dims(candidate_mention_ends, 0)) 
+        same_mention_start = tf.equal(gold_mention_starts, candidate_mention_starts)
+        same_mention_end = tf.equal(gold_mention_ends, candidate_mention_ends) 
+        # same_mention_start = tf.equal(tf.expand_dims(gold_mention_starts, 1), tf.expand_dims(candidate_mention_starts, 0))
+        # same_mention_end = tf.equal(tf.expand_dims(gold_mention_ends, 1), tf.expand_dims(candidate_mention_ends, 0)) 
         same_mention_span = tf.logical_and(same_mention_start, same_mention_end)
         
         candidate_cluster_idx_labels = tf.matmul(tf.expand_dims(gold_cluster_ids, 0), tf.to_int32(same_mention_span))  # [1, num_candidates]
@@ -540,8 +555,13 @@ class CorefQAModel(object):
                 0 represents token in this position should be neglected. 1 represents token in this position should be reserved. 
         """
         ones_input_mask = tf.ones_like(overlap_window_mask, tf.int32) # (num_window, window_size)
-        cumsum_input_mask = tf.math.cumsum(ones_input_mask, axis=1) # (num_window, window_size)
-        offset_input_mask = tf.tile(tf.expand_dims(tf.range(self.config.num_window) * self.config.window_size, 1), [1, self.config.window_size]) # (num_window, window_size)
+        cumsum_input_mask = tf.math.cumsum(ones_input_mask, axis=1) # (num_window, window_size) # do not equal to cumsum_input_mask -> (num_window, window_size)
+        # offset_input_mask = tf.tile(tf.expand_dims(tf.range(self.config.num_window) * self.config.window_size, 1), [1, self.config.window_size]) # (num_window, window_size)
+        row_cumsum_input_mask = self.get_shape(cumsum_input_mask, 0)
+        col_cumsum_input_mask = self.get_shape(cumsum_input_mask, 1)
+        offset_input_mask = tf.tile(tf.expand_dims(tf.range(row_cumsum_input_mask) * col_cumsum_input_mask, 1), [1, col_cumsum_input_mask])
+
+
         offset_cumsum_input_mask = offset_input_mask + cumsum_input_mask # (num_window, window_size)
         global_input_mask = tf.math.multiply(ones_input_mask, offset_cumsum_input_mask) # (num_window, window_size)
         global_input_mask = tf.reshape(global_input_mask, [-1]) # (num_window * window_size)
@@ -585,8 +605,6 @@ class CorefQAModel(object):
             use_tpu : if False, return tf.boolean_mask.  
         """
         with tf.name_scope(name_scope):
-            if not use_tpu:
-                return tf.boolean_mask(itemtensor, boolmask_indicator)
 
             boolmask_sum = tf.reduce_sum(tf.cast(boolmask_indicator, tf.int32))
             selected_positions = tf.cast(boolmask_indicator, dtype=tf.float32)
