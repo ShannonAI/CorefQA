@@ -23,8 +23,6 @@ class ModelConfig(object):
 
         self.output_dir = output_dir 
         config_path = os.path.join(self.output_dir, "{}_config.json".format(model_sign))
-        with open(config_path, "w") as f:
-            json.dump(self.__dict__, f, sort_keys=True, indent=2, ensure_ascii=False)
 
     def logging_configs(self):
         tf.logging.info("$*$"*30)

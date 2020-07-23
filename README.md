@@ -56,11 +56,11 @@ GPU for evaluation: with CUDA 10.0 Tensorflow 1.15 Python 3.5
 $ python3 -m pip install --user virtualenv
 $ virtualenv --python=python3.5 ~/corefqa_venv
 $ source ~/corefqa_venv/bin/activate
-$ cd coref-tf
+$ cd CorefQA
 $ pip install -r requirements.txt
 # If you are using TPU, please run the following commands:
-$ pip install cloud-tpu-client
-$ pip install google-cloud-storage
+$ pip install --upgrade google-api-python-client 
+$ pip install --upgrade oauth2client 
 ```
 
 ## Data Preprocess 
