@@ -186,7 +186,7 @@ Run the script in [./script/model/quoref_tpu.sh](https://github.com/ShannonAI/Co
 We use the best model (choose based on the performance on DEV set) on `Quoref` to initialize the CorefQA Model. 
   
 ### Train the CorefQA Model on the CoNLL-2012 Coreference Resolution Task 
-1.1 Your can  you can download the pre-trained [mention proposal model](https://storage.googleapis.com/public_model_checkpoints/mention_proposal/model.ckpt-22000.data-00000-of-00001). 
+1.1 Your can  you can download the pre-trained mention proposal model (including [model](https://storage.googleapis.com/public_model_checkpoints/mention_proposal/model.ckpt-22000.data-00000-of-00001), [meta](https://storage.googleapis.com/public_model_checkpoints/mention_proposal/model.ckpt-22000.meta) and [index](https://storage.googleapis.com/public_model_checkpoints/mention_proposal/model.ckpt-22000.index)). 
 
 1.2. Or train  the mention proposal model yourself. 
 
