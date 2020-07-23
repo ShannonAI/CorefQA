@@ -53,8 +53,8 @@ python3 ${REPO_PATH}/run/run_corefqa.py \
 --max_context_len=150 \
 --sec_qa_mention_score=False \
 --use_tpu=True \
---tpu_name=TPU_NAME \
---tpu_zone=TPU_ZONE \
---gcp_project=GCP_PROJECT \
---num_tpu_scores=1 \
+--tpu_name=$TPU_NAME \
+--tpu_zone=$TPU_ZONE \
+--gcp_project=$GCP_PROJECT \
+--num_tpu_cores=1 \
 --seed=2333
