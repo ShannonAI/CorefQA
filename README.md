@@ -59,8 +59,8 @@ $ source ~/corefqa_venv/bin/activate
 $ cd coref-tf
 $ pip install -r requirements.txt
 # If you are using TPU, please run the following commands:
-$ pip install cloud-tpu-client
-$ pip install google-cloud-storage
+$ pip install --upgrade google-api-python-client 
+$ pip install --upgrade oauth2client 
 ```
 
 ## Data Preprocess 
