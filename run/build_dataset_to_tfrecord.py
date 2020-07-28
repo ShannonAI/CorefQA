@@ -6,7 +6,7 @@
 # author: xiaoy li
 # description:
 # generate tfrecord for train/dev/test set for the model. 
-# TODO (xiaoya): need to add help description for args 
+# TODO (xiaoya): need to add help description for args  
 
 
 
