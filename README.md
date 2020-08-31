@@ -311,7 +311,7 @@ The codebase also provides the option of evaluating a single model/checkpoint. P
 <br>
  
 ## Download the Final CorefQA Model
-You can download the final CorefQA model at [link](https://storage.googleapis.com/public_model_checkpoints) and follow the instructions in the prediciton to obtain the score reported in the paper. 
+You can download the final CorefQA model at [link](https://drive.google.com/file/d/1RPYsS2dDxYyii7-3NkBNG7VtuA96NBLf/view?usp=sharing) and follow the instructions in the prediciton to obtain the score reported in the paper. 
 
 
 ## Descriptions of Directories
